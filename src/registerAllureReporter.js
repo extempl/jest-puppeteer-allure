@@ -9,6 +9,7 @@ function registerAllureReporter() {
   let asyncFlow = null;
   let logError = [];
   let logPageError = [];
+  let navigation = [];
 
   const wait = async () => {
     await asyncFlow;
@@ -42,6 +43,7 @@ function registerAllureReporter() {
         const errorText = `${logError.join('\n')}\n${logPageError.join('\n')}`;
         allure.addAttachment('console error', errorText, 'text/plain');
       }
+      allure.addAttachment('navigation log', navigation.join('\n'), 'text/plain');
       const rx = /See diff for details: (.*)/g;
       const arrMessage = rx.exec(error.message);
       if (arrMessage) {
@@ -59,12 +61,12 @@ function registerAllureReporter() {
     if (!process.env.PWD) {
       return;
     }
-    const projectDirName = process.env.PWD.split('/').slice(-1)[0];
+    const projectDirName = process.env.PWD.split('/').slice(-2)[0];
     const rx = new RegExp(`(?<=${projectDirName}\/).*`, 'g');
     const testPath = rx.exec(spec.testPath);
     if (testPath && testPath[0]) {
       const projectName = process.env.JOB_NAME ? process.env.JOB_NAME.split('/')[0] : projectDirName
-      const webStormPath = `<a class='link' href='jetbrains://web-storm/navigate/reference?project=${projectName}&path=${testPath[0]}'>Открыть в WebStorm</a>`
+      const webStormPath = `<a class='link' href='jetbrains://idea/navigate/reference?project=${projectName}&path=${projectDirName}/${testPath[0]}'>Open in IDEA</a>`
       allure.setDescription(
         `${testPath[0]}<br><br>${webStormPath}`
       );
@@ -87,6 +89,9 @@ function registerAllureReporter() {
   jasmine.getEnv().addReporter({
     suiteStarted: suite => {
       addTaskToFlow(async () => {
+        page.on('load', () => {
+          navigation.push(page.url());
+        })
         page.on('error', err => {
           logError.push(err.toString());
         });
@@ -103,6 +108,7 @@ function registerAllureReporter() {
       addTaskToFlow(async () => {
         logError = [];
         logPageError = [];
+        navigation = [];
         allure.startCase(spec.fullName);
         if (global.browserName) {
           allure.getCurrentTest().addParameter('argument', 'browserName', global.browserName);
